@@ -1,0 +1,8 @@
+{
+    "augment.advanced": {
+
+    },
+    "augment.nextEdit.highlightSuggestionsInTheEditor": true,
+    "augment.nextEdit.enableGlobalBackgroundSuggestions": true,
+    "cmake.sourceDirectory": "C:/Users/agatha.youyou/Downloads/EyeConApp/eyecon_application/linux"
+}

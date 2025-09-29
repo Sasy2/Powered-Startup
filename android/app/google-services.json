@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "526740236707",
+    "project_id": "eyecon-app-f0024",
+    "storage_bucket": "eyecon-app-f0024.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:526740236707:android:2fe731bd0cf910b7d31216",
+        "android_client_info": {
+          "package_name": "com.example.eyecon_application"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-y9FWPoLyzqKIzAG4me_J-IJ94AaGj5U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
