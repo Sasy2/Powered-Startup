@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../models/comprehensive_vision_test.dart';
+import '../widgets/vision_test_painters.dart';
+import '../widgets/professional_illustrations.dart';
+import '../widgets/app_header.dart';
+import '../widgets/app_footer.dart';
+import 'vision_test_selection_screen.dart';
+import 'vision_test_results_screen.dart';
 // import 'package:flutter_tts/flutter_tts.dart';
 
 class VisionTestScreen extends StatefulWidget {
-  const VisionTestScreen({super.key});
+  final String? initialTestType;
+  
+  const VisionTestScreen({super.key, this.initialTestType});
 
   @override
   State<VisionTestScreen> createState() => _VisionTestScreenState();
@@ -13,6 +22,7 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
   // Test phases
   String currentPhase = 'calibration'; // 'calibration', 'instructions', 'test', 'switch_eye', 'results'
   String currentEye = 'right'; // Start with right eye
+  String currentTestType = 'visual_acuity'; // 'visual_acuity', 'astigmatism', 'near_vision', 'color_vision'
   int currentTest = 0;
   int currentQuestion = 0;
   bool showResults = false;
@@ -25,22 +35,37 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
   double phoneDistanceCm = 40.0; // Distance from phone to eyes
   double simulatedDistanceM = 3.0; // Simulated 3m distance for Snellen test
   
+  // Test configuration
+  late TestConfiguration testConfig;
+  
   // Test results
-  Map<String, dynamic> testResults = {
-    'leftEye': {
-      'visualAcuity': '20/20',
-      'bestLine': 0,
-    },
-    'rightEye': {
-      'visualAcuity': '20/20', 
-      'bestLine': 0,
-    },
-    'confidence': 85,
-  };
+  TestResults rightEyeResults = TestResults(
+    acuityScore: '20/20',
+    astigmatismAxis: 0,
+    astigmatismCyl: 0.0,
+    colorVisionResult: 'normal',
+    nearVision: 'N8',
+    astigmatismTests: [],
+    colorVisionTests: [],
+    nearVisionTests: [],
+  );
+  
+  TestResults leftEyeResults = TestResults(
+    acuityScore: '20/20',
+    astigmatismAxis: 0,
+    astigmatismCyl: 0.0,
+    colorVisionResult: 'normal',
+    nearVision: 'N8',
+    astigmatismTests: [],
+    colorVisionTests: [],
+    nearVisionTests: [],
+  );
+  
+  CompleteTestResults? completeResults;
   
   int correctAnswers = 0;
   int totalQuestions = 0;
-  
+
   // TTS for voice instructions
   // FlutterTts flutterTts = FlutterTts();
 
@@ -73,6 +98,23 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
     super.initState();
     // Initialize pixelToMmRatio with a default value based on initial screen density
     pixelToMmRatio = creditCardWidthMm / creditCardWidthPixels;
+    
+    // Initialize test configuration
+    testConfig = TestConfiguration(
+      pixelToMmRatio: pixelToMmRatio,
+      phoneDistanceCm: phoneDistanceCm,
+      simulatedDistanceM: simulatedDistanceM,
+      creditCardWidthMm: creditCardWidthMm,
+      creditCardWidthPixels: creditCardWidthPixels,
+      useProximitySensor: false,
+      enableVoiceInstructions: true,
+    );
+    
+    // Set initial test type if provided
+    if (widget.initialTestType != null) {
+      currentTestType = widget.initialTestType!;
+      currentPhase = 'test'; // Skip calibration and instructions, go directly to test
+    }
   }
 
   @override
@@ -82,14 +124,14 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
+            const AppHeader(title: 'Vision Test'),
             Expanded(
               child: _buildCurrentPhase(),
             ),
+            const AppFooter(currentIndex: 2),
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigation(context),
     );
   }
 
@@ -100,13 +142,28 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
       case 'instructions':
         return _buildInstructions();
       case 'test':
-        return _buildSnellenTest();
+        return _buildCurrentTest();
       case 'switch_eye':
         return _buildSwitchEyeScreen();
       case 'results':
         return _buildResults();
       default:
         return _buildInstructions();
+    }
+  }
+
+  Widget _buildCurrentTest() {
+    switch (currentTestType) {
+      case 'visual_acuity':
+        return _buildSnellenTest();
+      case 'astigmatism':
+        return _buildAstigmatismTest();
+      case 'near_vision':
+        return _buildNearVisionTest();
+      case 'color_vision':
+        return _buildColorVisionTest();
+      default:
+        return _buildSnellenTest();
     }
   }
 
@@ -150,7 +207,7 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
             ],
           ),
           if (currentPhase == 'test') ...[
-            const SizedBox(height: 20),
+          const SizedBox(height: 20),
             Text(
               'Testing ${currentEye == 'left' ? 'Left' : 'Right'} Eye',
               style: const TextStyle(
@@ -263,10 +320,10 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
                 // Scale slider
                 Column(
                   children: [
-                    Text(
+          Text(
                       'Width: ${creditCardWidthPixels.toStringAsFixed(1)} pixels',
-                      style: const TextStyle(
-                        fontSize: 16,
+            style: const TextStyle(
+              fontSize: 16,
                         fontWeight: FontWeight.w500,
                         color: Color(0xFF111718),
                       ),
@@ -342,7 +399,7 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
           ),
           const SizedBox(height: 30),
           const Text(
-            'Snellen Visual Acuity Test',
+            'Comprehensive Vision Test',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -351,6 +408,41 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFB),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.medical_services,
+                  size: 60,
+                  color: Color(0xFF10B2D0),
+                ),
+                const SizedBox(height: 15),
+                const Text(
+                  'Test Overview',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF111718),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                const Text(
+                  'This comprehensive test includes:\n\n• Visual Acuity (Snellen chart)\n• Astigmatism detection\n• Near vision assessment\n• Color vision testing\n\nEach test will be performed on both eyes separately.',
+                  style: TextStyle(
+                    fontSize: 14,
+              color: Color(0xFF618389),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -376,7 +468,7 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
                 ),
                 const SizedBox(height: 15),
                 const Text(
-                  '1. Hold your phone at arm\'s length (about 40 cm away)\n2. Cover your LEFT eye with your hand\n3. Keep your RIGHT eye open\n4. When ready, tap "Start Test" or say "Start"',
+                  '1. Hold your phone at arm\'s length (about 40 cm away)\n2. Cover your LEFT eye with your hand\n3. Keep your RIGHT eye open\n4. Follow the on-screen instructions for each test\n5. Tap to select your answers',
                   style: TextStyle(
                     fontSize: 14,
                     color: Color(0xFF618389),
@@ -390,13 +482,13 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                setState(() {
-                  currentPhase = 'test';
-                  currentLine = 0;
-                  currentLetterIndex = 0;
-                  selectedLetter = null;
-                  isRetry = false;
-                });
+                // Navigate to test selection screen
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const VisionTestSelectionScreen(),
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B2D0),
@@ -406,7 +498,7 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
                 ),
               ),
               child: const Text(
-                'Start Test',
+                'Start Comprehensive Test',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -469,18 +561,18 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
                     maxWidth: MediaQuery.of(context).size.width * 0.8,
                     maxHeight: MediaQuery.of(context).size.height * 0.4,
                   ),
-                  child: Text(
+              child: Text(
                     letterToShow,
-                    style: TextStyle(
+                style: TextStyle(
                       fontSize: letterSizePixels,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF111718),
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF111718),
+                ),
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.visible,
-                  ),
-                ),
               ),
+            ),
+          ),
             ),
           ),
           const SizedBox(height: 40),
@@ -524,6 +616,29 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
             ),
             const SizedBox(height: 20),
           ],
+          // Return button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Back'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF618389),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+              Text(
+                'Line ${currentLine + 1} of ${snellenLines.length}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF618389),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -636,7 +751,7 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
                 ),
                 const SizedBox(height: 15),
                 const Text(
-                  '1. Cover your RIGHT eye with your hand\n2. Keep your LEFT eye open\n3. When ready, tap "Continue"',
+                  '1. Cover your RIGHT eye with your hand\n2. Keep your LEFT eye open\n3. Repeat all tests for your left eye\n4. When ready, tap "Continue"',
                   style: TextStyle(
                     fontSize: 14,
                     color: Color(0xFF618389),
@@ -653,6 +768,8 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
                 setState(() {
                   currentPhase = 'test';
                   currentEye = 'left';
+                  currentTestType = 'visual_acuity'; // Reset to first test
+                  currentTest = 0;
                   currentLine = 0;
                   currentLetterIndex = 0;
                   selectedLetter = null;
@@ -667,7 +784,7 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
                 ),
               ),
               child: const Text(
-                'Continue',
+                'Continue to Test Selection',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -683,6 +800,8 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
   }
 
   Widget _buildTestComplete() {
+    // This method should rarely be called now since we auto-proceed
+    // But if it is called, show a simple completion message
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -704,7 +823,7 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
           ),
           const SizedBox(height: 30),
           Text(
-            '${currentEye == 'left' ? 'Left' : 'Right'} Eye Test Complete!',
+            '${_getTestTypeName()} Complete!',
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -713,81 +832,104 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
-          if (currentEye == 'right') ...[
-            const Text(
-              'Now let\'s test your left eye.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF618389),
-              ),
-              textAlign: TextAlign.center,
+          const Text(
+            'Moving to next test...',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF618389),
             ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    currentPhase = 'switch_eye';
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B2D0),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 30),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                _nextTest();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B2D0),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
-                  'Test Left Eye',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+              ),
+              child: Text(
+                'Continue to ${_getNextTestTypeName()}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
             ),
-          ] else ...[
-            const Text(
-              'All tests completed! Let\'s see your results.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF618389),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    currentPhase = 'results';
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4ECDC4),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'View Results',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
           const SizedBox(height: 20),
         ],
       ),
     );
+  }
+
+  String _getTestTypeName() {
+    switch (currentTestType) {
+      case 'visual_acuity':
+        return 'Visual Acuity Test';
+      case 'astigmatism':
+        return 'Astigmatism Test';
+      case 'near_vision':
+        return 'Near Vision Test';
+      case 'color_vision':
+        return 'Color Vision Test';
+      default:
+        return 'Test';
+    }
+  }
+
+  String _getNextTestTypeName() {
+    final testTypes = ['visual_acuity', 'astigmatism', 'near_vision', 'color_vision'];
+    final currentIndex = testTypes.indexOf(currentTestType);
+    if (currentIndex < testTypes.length - 1) {
+      final nextType = testTypes[currentIndex + 1];
+      switch (nextType) {
+        case 'visual_acuity':
+          return 'Visual Acuity Test';
+        case 'astigmatism':
+          return 'Astigmatism Test';
+        case 'near_vision':
+          return 'Near Vision Test';
+        case 'color_vision':
+          return 'Color Vision Test';
+        default:
+          return 'Next Test';
+      }
+    }
+    return 'Next Test';
+  }
+
+
+  void _nextTest() {
+    final testTypes = ['visual_acuity', 'astigmatism', 'near_vision', 'color_vision'];
+    final currentIndex = testTypes.indexOf(currentTestType);
+    
+    if (currentIndex < testTypes.length - 1) {
+      final nextTestType = testTypes[currentIndex + 1];
+      setState(() {
+        currentTestType = nextTestType;
+        currentTest = 0;
+        currentLine = 0;
+        currentLetterIndex = 0;
+        selectedLetter = null;
+        isRetry = false;
+      });
+    } else {
+      // All tests complete, navigate to results screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const VisionTestResultsScreen(),
+        ),
+      );
+    }
   }
 
   // Helper method to calculate letter size in pixels based on Snellen formula
@@ -832,11 +974,16 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
       // Correct answer - move to next letter or line
       _handleCorrectAnswer();
     } else {
-      // Wrong answer - show retry option
-      setState(() {
-        isRetry = true;
-      });
+      // Wrong answer - record and continue to next letter
+      _recordWrongAnswer();
+      _handleCorrectAnswer(); // Continue to next letter/line
     }
+  }
+
+  void _recordWrongAnswer() {
+    // Record wrong answer for analytics/tracking
+    // You can add more detailed tracking here if needed
+    // For now, we just continue to the next letter/line
   }
 
   void _handleCorrectAnswer() {
@@ -853,6 +1000,27 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
         currentLetterIndex = 0;
         selectedLetter = null;
         isRetry = false;
+        
+        // Check if we've completed all lines for this test type
+        if (currentLine >= snellenLines.length) {
+          // Visual acuity test complete, move to next test or switch eyes
+          if (currentTestType == 'visual_acuity') {
+            if (currentEye == 'right') {
+              // Right eye complete, switch to left eye
+              currentPhase = 'switch_eye';
+            } else {
+              // Left eye complete, move to next test type
+              _nextTest();
+            }
+          } else {
+            // Other test types, move to next test or switch eyes
+            if (currentEye == 'right') {
+              currentPhase = 'switch_eye';
+            } else {
+              _nextTest();
+            }
+          }
+        }
       }
     });
   }
@@ -860,38 +1028,41 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
   void _recordBestLine() {
     final acuity = snellenLines[currentLine]['acuity'] as String;
     if (currentEye == 'right') {
-      testResults['rightEye']['visualAcuity'] = acuity;
-      testResults['rightEye']['bestLine'] = currentLine;
+      rightEyeResults = TestResults(
+        acuityScore: acuity,
+        astigmatismAxis: rightEyeResults.astigmatismAxis,
+        astigmatismCyl: rightEyeResults.astigmatismCyl,
+        colorVisionResult: rightEyeResults.colorVisionResult,
+        nearVision: rightEyeResults.nearVision,
+        astigmatismTests: rightEyeResults.astigmatismTests,
+        colorVisionTests: rightEyeResults.colorVisionTests,
+        nearVisionTests: rightEyeResults.nearVisionTests,
+      );
     } else {
-      testResults['leftEye']['visualAcuity'] = acuity;
-      testResults['leftEye']['bestLine'] = currentLine;
+      leftEyeResults = TestResults(
+        acuityScore: acuity,
+        astigmatismAxis: leftEyeResults.astigmatismAxis,
+        astigmatismCyl: leftEyeResults.astigmatismCyl,
+        colorVisionResult: leftEyeResults.colorVisionResult,
+        nearVision: leftEyeResults.nearVision,
+        astigmatismTests: leftEyeResults.astigmatismTests,
+        colorVisionTests: leftEyeResults.colorVisionTests,
+        nearVisionTests: leftEyeResults.nearVisionTests,
+      );
     }
   }
 
-  Widget _buildResults() {
+  // Astigmatism Test Methods
+  Widget _buildAstigmatismTest() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           const SizedBox(height: 20),
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: const Color(0xFF10B2D0).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(60),
-            ),
-            child: const Icon(
-              Icons.visibility,
-              size: 60,
-              color: Color(0xFF10B2D0),
-            ),
-          ),
-          const SizedBox(height: 30),
-          const Text(
-            'Vision Test Results',
-            style: TextStyle(
-              fontSize: 28,
+          Text(
+            'Astigmatism Test - ${_getAstigmatismTestName()}',
+            style: const TextStyle(
+              fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Color(0xFF111718),
             ),
@@ -899,52 +1070,776 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Confidence Score: ${testResults['confidence']}%',
+            'Testing ${currentEye == 'left' ? 'Left' : 'Right'} Eye',
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               color: Color(0xFF618389),
             ),
           ),
           const SizedBox(height: 30),
-          _buildEyeResults('Right Eye', testResults['rightEye']),
-          const SizedBox(height: 20),
-          _buildEyeResults('Left Eye', testResults['leftEye']),
+          _buildAstigmatismChart(),
           const SizedBox(height: 30),
+          const Text(
+            'Tap the line that appears darkest or clearest',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF111718),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          // Return button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Back'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF618389),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+              Text(
+                'Test ${currentTest + 1} of 3',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF618389),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getAstigmatismTestName() {
+    switch (currentTest) {
+      case 0:
+        return 'Fan Chart';
+      case 1:
+        return 'Clock Dial';
+      case 2:
+        return 'Parallel Lines';
+      default:
+        return 'Fan Chart';
+    }
+  }
+
+  Widget _buildAstigmatismChart() {
+    switch (currentTest) {
+      case 0:
+        return _buildFanChart();
+      case 1:
+        return _buildClockDial();
+      case 2:
+        return _buildParallelLines();
+      default:
+        return _buildFanChart();
+    }
+  }
+
+  Widget _buildFanChart() {
+    return Container(
+      width: 300,
+      height: 300,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: CustomPaint(
+        painter: FanChartPainter(),
+        child: GestureDetector(
+          onTapDown: (details) => _handleFanChartTap(details),
+          child: Container(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClockDial() {
+    return Container(
+      width: 300,
+      height: 300,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: CustomPaint(
+        painter: ClockDialPainter(),
+        child: GestureDetector(
+          onTapDown: (details) => _handleClockDialTap(details),
+          child: Container(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildParallelLines() {
+    return Container(
+      width: 300,
+            height: 200,
+            decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: CustomPaint(
+        painter: ParallelLinesPainter(),
+        child: GestureDetector(
+          onTapDown: (details) => _handleParallelLinesTap(details),
+          child: Container(),
+        ),
+      ),
+    );
+  }
+
+  void _handleFanChartTap(TapDownDetails details) {
+    // Calculate which line was tapped
+    final center = const Offset(150, 150);
+    final tapPoint = details.localPosition;
+    final angle = math.atan2(tapPoint.dy - center.dy, tapPoint.dx - center.dx);
+    final degrees = (angle * 180 / math.pi + 360) % 360;
+    final lineNumber = (degrees / 15).round() % 24; // 24 lines, 15 degrees apart
+    
+    _recordAstigmatismResult('fan_chart', lineNumber, lineNumber, true, 0.8);
+    _nextAstigmatismTest();
+  }
+
+  void _handleClockDialTap(TapDownDetails details) {
+    // Calculate which hour was tapped
+    final center = const Offset(150, 150);
+    final tapPoint = details.localPosition;
+    final angle = math.atan2(tapPoint.dy - center.dy, tapPoint.dx - center.dx);
+    final degrees = (angle * 180 / math.pi + 90) % 360; // Start from 12 o'clock
+    final hour = (degrees / 30).round() % 12; // 12 hours, 30 degrees apart
+    
+    _recordAstigmatismResult('clock_dial', hour, hour, true, 0.8);
+    _nextAstigmatismTest();
+  }
+
+  void _handleParallelLinesTap(TapDownDetails details) {
+    // Determine which set of lines was tapped
+    final y = details.localPosition.dy;
+    final setNumber = y < 100 ? 0 : 1; // Top or bottom set
+    
+    _recordAstigmatismResult('parallel_lines', setNumber, setNumber, true, 0.8);
+    _nextAstigmatismTest();
+  }
+
+  void _recordAstigmatismResult(String testType, int selectedLine, int correctLine, bool isCorrect, double confidence) {
+    final result = AstigmatismTestResult(
+      testType: testType,
+      selectedLine: selectedLine,
+      correctLine: correctLine,
+      isCorrect: isCorrect,
+      confidence: confidence,
+    );
+
+    if (currentEye == 'right') {
+      rightEyeResults = TestResults(
+        acuityScore: rightEyeResults.acuityScore,
+        astigmatismAxis: rightEyeResults.astigmatismAxis,
+        astigmatismCyl: rightEyeResults.astigmatismCyl,
+        colorVisionResult: rightEyeResults.colorVisionResult,
+        nearVision: rightEyeResults.nearVision,
+        astigmatismTests: [...rightEyeResults.astigmatismTests, result],
+        colorVisionTests: rightEyeResults.colorVisionTests,
+        nearVisionTests: rightEyeResults.nearVisionTests,
+      );
+    } else {
+      leftEyeResults = TestResults(
+        acuityScore: leftEyeResults.acuityScore,
+        astigmatismAxis: leftEyeResults.astigmatismAxis,
+        astigmatismCyl: leftEyeResults.astigmatismCyl,
+        colorVisionResult: leftEyeResults.colorVisionResult,
+        nearVision: leftEyeResults.nearVision,
+        astigmatismTests: [...leftEyeResults.astigmatismTests, result],
+        colorVisionTests: leftEyeResults.colorVisionTests,
+        nearVisionTests: leftEyeResults.nearVisionTests,
+      );
+    }
+  }
+
+  void _nextAstigmatismTest() {
+    setState(() {
+      currentTest++;
+      if (currentTest >= 3) {
+        // All astigmatism tests complete
+        if (currentEye == 'right') {
+          currentPhase = 'switch_eye';
+        } else {
+          // Left eye complete, move to next test type
+          _nextTest();
+        }
+      }
+    });
+  }
+
+  // Near Vision Test Methods
+  Widget _buildNearVisionTest() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          const Text(
+            'Near Vision Test',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF111718),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Testing ${currentEye == 'left' ? 'Left' : 'Right'} Eye',
+            style: const TextStyle(
+              fontSize: 18,
+              color: Color(0xFF618389),
+            ),
+          ),
+          const SizedBox(height: 30),
+          _buildNearVisionText(),
+          const SizedBox(height: 30),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton(
+                onPressed: () => _recordNearVisionResult(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4ECDC4),
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                ),
+                child: const Text('Yes, I can read this'),
+              ),
+              ElevatedButton(
+                onPressed: () => _recordNearVisionResult(false),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF6B6B),
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                ),
+                child: const Text('No, I cannot read this'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Return button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Back'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF618389),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+              Text(
+                'Test ${currentTest + 1} of 3',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF618389),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNearVisionText() {
+    final textSizes = ['N12', 'N10', 'N8', 'N6', 'N5'];
+    final currentSize = textSizes[math.min(currentTest, textSizes.length - 1)];
+    final fontSize = _getNearVisionFontSize(currentSize);
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+        color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+              child: Text(
+        'The quick brown fox jumps over the lazy dog. This is a standard reading test to check your near vision ability.',
+        style: TextStyle(
+          fontSize: fontSize,
+          color: const Color(0xFF111718),
+          height: 1.5,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  double _getNearVisionFontSize(String size) {
+    switch (size) {
+      case 'N12': return 24.0;
+      case 'N10': return 20.0;
+      case 'N8': return 16.0;
+      case 'N6': return 12.0;
+      case 'N5': return 10.0;
+      default: return 16.0;
+    }
+  }
+
+  void _recordNearVisionResult(bool canRead) {
+    final textSizes = ['N12', 'N10', 'N8', 'N6', 'N5'];
+    final currentSize = textSizes[math.min(currentTest, textSizes.length - 1)];
+    final fontSize = _getNearVisionFontSize(currentSize);
+    
+    final result = NearVisionTestResult(
+      textSize: currentSize,
+      canRead: canRead,
+      textContent: 'The quick brown fox jumps over the lazy dog.',
+      fontSize: fontSize,
+    );
+
+    if (currentEye == 'right') {
+      rightEyeResults = TestResults(
+        acuityScore: rightEyeResults.acuityScore,
+        astigmatismAxis: rightEyeResults.astigmatismAxis,
+        astigmatismCyl: rightEyeResults.astigmatismCyl,
+        colorVisionResult: rightEyeResults.colorVisionResult,
+        nearVision: canRead ? currentSize : rightEyeResults.nearVision,
+        astigmatismTests: rightEyeResults.astigmatismTests,
+        colorVisionTests: rightEyeResults.colorVisionTests,
+        nearVisionTests: [...rightEyeResults.nearVisionTests, result],
+      );
+    } else {
+      leftEyeResults = TestResults(
+        acuityScore: leftEyeResults.acuityScore,
+        astigmatismAxis: leftEyeResults.astigmatismAxis,
+        astigmatismCyl: leftEyeResults.astigmatismCyl,
+        colorVisionResult: leftEyeResults.colorVisionResult,
+        nearVision: canRead ? currentSize : leftEyeResults.nearVision,
+        astigmatismTests: leftEyeResults.astigmatismTests,
+        colorVisionTests: leftEyeResults.colorVisionTests,
+        nearVisionTests: [...leftEyeResults.nearVisionTests, result],
+      );
+    }
+
+    setState(() {
+      currentTest++;
+      if (currentTest >= 5 || !canRead) {
+        // All near vision tests complete or user can't read current size
+        if (currentEye == 'right') {
+          currentPhase = 'switch_eye';
+        } else {
+          // Left eye complete, move to next test type
+          _nextTest();
+        }
+      }
+    });
+  }
+
+  // Color Vision Test Methods
+  Widget _buildColorVisionTest() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          const Text(
+            'Color Vision Test',
+            style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF111718),
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Testing ${currentEye == 'left' ? 'Left' : 'Right'} Eye',
+            style: const TextStyle(
+              fontSize: 18,
+              color: Color(0xFF618389),
+            ),
+          ),
+          const SizedBox(height: 30),
+          _buildIshiharaPlate(),
+          const SizedBox(height: 30),
+          const Text(
+            'What number do you see in the circle?',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF111718),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          _buildNumberGrid(),
+          const SizedBox(height: 20),
+          // Return button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Back'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF618389),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+              Text(
+                'Test ${currentTest + 1} of 3',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF618389),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIshiharaPlate() {
+    return Container(
+      width: 250,
+      height: 250,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(125),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: CustomPaint(
+        painter: IshiharaPlatePainter(plateNumber: currentTest + 1),
+        child: Container(),
+      ),
+    );
+  }
+
+  Widget _buildNumberGrid() {
+    final numbers = ['12', '8', '6', '3', '5', '2', '9', '7', '1', '4'];
+
+    return Wrap(
+      spacing: 15,
+      runSpacing: 15,
+      children: numbers.map((number) {
+        return GestureDetector(
+          onTap: () => _handleColorVisionSelection(number),
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F4F4),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: const Color(0xFFDBE4E6)),
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF111718),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  void _handleColorVisionSelection(String selectedNumber) {
+    final correctAnswers = ['12', '8', '6', '3', '5']; // Correct answers for plates 1-5
+    final correctAnswer = correctAnswers[math.min(currentTest, correctAnswers.length - 1)];
+    final isCorrect = selectedNumber == correctAnswer;
+    
+    final result = ColorVisionTestResult(
+      plateNumber: currentTest + 1,
+      userAnswer: selectedNumber,
+      correctAnswer: correctAnswer,
+      isCorrect: isCorrect,
+      plateType: 'ishihara',
+    );
+
+    if (currentEye == 'right') {
+      rightEyeResults = TestResults(
+        acuityScore: rightEyeResults.acuityScore,
+        astigmatismAxis: rightEyeResults.astigmatismAxis,
+        astigmatismCyl: rightEyeResults.astigmatismCyl,
+        colorVisionResult: isCorrect ? 'normal' : 'deuteranopia',
+        nearVision: rightEyeResults.nearVision,
+        astigmatismTests: rightEyeResults.astigmatismTests,
+        colorVisionTests: [...rightEyeResults.colorVisionTests, result],
+        nearVisionTests: rightEyeResults.nearVisionTests,
+      );
+    } else {
+      leftEyeResults = TestResults(
+        acuityScore: leftEyeResults.acuityScore,
+        astigmatismAxis: leftEyeResults.astigmatismAxis,
+        astigmatismCyl: leftEyeResults.astigmatismCyl,
+        colorVisionResult: isCorrect ? 'normal' : 'deuteranopia',
+        nearVision: leftEyeResults.nearVision,
+        astigmatismTests: leftEyeResults.astigmatismTests,
+        colorVisionTests: [...leftEyeResults.colorVisionTests, result],
+        nearVisionTests: leftEyeResults.nearVisionTests,
+      );
+    }
+
+    setState(() {
+      currentTest++;
+      if (currentTest >= 5) {
+        // All color vision tests complete
+        if (currentEye == 'right') {
+          currentPhase = 'switch_eye';
+        } else {
+          // Left eye complete, move to next test type
+          _nextTest();
+        }
+      }
+    });
+  }
+
+  Widget _buildResults() {
+    // Calculate complete results
+    completeResults = CompleteTestResults(
+      userId: 'demo_user',
+      timestamp: DateTime.now(),
+      rightEye: rightEyeResults,
+      leftEye: leftEyeResults,
+      estimatedRx: RefractionEstimator.estimatePrescription(rightEyeResults, leftEyeResults),
+      confidenceScore: 85,
+      recommendations: _generateRecommendations(),
+    );
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          // Celebration header
           Container(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF4ECDC4), Color(0xFF44A08D)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4ECDC4).withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                SizedBox(
+            width: 120,
+            height: 120,
+                  child: ProfessionalIllustrations.successCelebration(
+                    primaryColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Wahoo! You completed the test!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'An eye doctor will review your results in about 48 hours.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white70,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          // Results summary
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'Your Vision Test Results',
+                style: TextStyle(
+                    fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                    color: Color(0xFF111718),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildResultMetric('Confidence', '${completeResults?.confidenceScore ?? 85}%', Icons.analytics),
+                    _buildResultMetric('Right Eye', rightEyeResults.acuityScore, Icons.visibility),
+                    _buildResultMetric('Left Eye', leftEyeResults.acuityScore, Icons.visibility),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildEyeResults('Right Eye', rightEyeResults),
+          const SizedBox(height: 16),
+          _buildEyeResults('Left Eye', leftEyeResults),
+          const SizedBox(height: 20),
+          _buildPrescriptionCard(),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: const Color(0xFFFFF3CD),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFFFEAA7)),
             ),
-            child: const Text(
-              'Great job! These results will be saved. Move to the next test.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF856404),
-              ),
-              textAlign: TextAlign.center,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  color: Color(0xFF856404),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'These are preliminary results. Please consult an eye care professional for accurate diagnosis and prescription.',
+            style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF856404),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
               onPressed: () {
                 setState(() {
-                  currentPhase = 'calibration';
-                  currentEye = 'right';
-                  currentLine = 0;
+                      currentPhase = 'calibration';
+                      currentEye = 'right';
+                      currentTestType = 'visual_acuity';
+                  currentTest = 0;
+                      currentLine = 0;
                   currentLetterIndex = 0;
-                  selectedLetter = null;
-                  isRetry = false;
-                  // Reset results
-                  testResults = {
-                    'leftEye': {'visualAcuity': '20/20', 'bestLine': 0},
-                    'rightEye': {'visualAcuity': '20/20', 'bestLine': 0},
-                    'confidence': 85,
-                  };
+                      selectedLetter = null;
+                      isRetry = false;
+                      // Reset results
+                      rightEyeResults = TestResults(
+                        acuityScore: '20/20',
+                        astigmatismAxis: 0,
+                        astigmatismCyl: 0.0,
+                        colorVisionResult: 'normal',
+                        nearVision: 'N8',
+                        astigmatismTests: [],
+                        colorVisionTests: [],
+                        nearVisionTests: [],
+                      );
+                      leftEyeResults = TestResults(
+                        acuityScore: '20/20',
+                        astigmatismAxis: 0,
+                        astigmatismCyl: 0.0,
+                        colorVisionResult: 'normal',
+                        nearVision: 'N8',
+                        astigmatismTests: [],
+                        colorVisionTests: [],
+                        nearVisionTests: [],
+                      );
                 });
+              },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    side: const BorderSide(color: Color(0xFF10B2D0)),
+                  ),
+                  child: const Text(
+                    'Retake Test',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF10B2D0),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const VisionTestResultsScreen(),
+                    ),
+                  );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B2D0),
@@ -954,7 +1849,7 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
                 ),
               ),
               child: const Text(
-                'Take Test Again',
+                    'Continue',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -962,6 +1857,8 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
                 ),
               ),
             ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
         ],
@@ -969,14 +1866,14 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
     );
   }
 
-  Widget _buildEyeResults(String eyeName, Map<String, dynamic> results) {
+  Widget _buildEyeResults(String eyeName, TestResults results) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFB),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: const Color(0xFFDBE4E6)),
-      ),
+        ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -989,11 +1886,90 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
             ),
           ),
           const SizedBox(height: 15),
-          _buildResultRow('Visual Acuity', results['visualAcuity'], Icons.visibility),
-          _buildResultRow('Best Line', 'Line ${results['bestLine'] + 1}', Icons.format_list_numbered),
+          _buildResultRow('Visual Acuity', results.acuityScore, Icons.visibility),
+          _buildResultRow('Astigmatism Axis', '${results.astigmatismAxis}°', Icons.rotate_right),
+          _buildResultRow('Color Vision', results.colorVisionResult, Icons.palette),
+          _buildResultRow('Near Vision', results.nearVision, Icons.text_fields),
         ],
       ),
     );
+  }
+
+  Widget _buildPrescriptionCard() {
+    if (completeResults == null) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+        color: const Color(0xFF10B2D0).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xFF10B2D0)),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'Estimated Prescription',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF111718),
+            ),
+          ),
+          const SizedBox(height: 15),
+          Text(
+            completeResults!.estimatedRx.formattedPrescription,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF10B2D0),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'SPH: ${completeResults!.estimatedRx.sph >= 0 ? '+' : ''}${completeResults!.estimatedRx.sph.toStringAsFixed(2)}',
+            style: const TextStyle(fontSize: 16, color: Color(0xFF111718)),
+          ),
+          Text(
+            'CYL: ${completeResults!.estimatedRx.cyl >= 0 ? '+' : ''}${completeResults!.estimatedRx.cyl.toStringAsFixed(2)}',
+            style: const TextStyle(fontSize: 16, color: Color(0xFF111718)),
+          ),
+          Text(
+            'Axis: ${completeResults!.estimatedRx.axis}°',
+            style: const TextStyle(fontSize: 16, color: Color(0xFF111718)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _generateRecommendations() {
+    final recommendations = <String>[];
+    
+    // Visual acuity recommendations
+    if (rightEyeResults.acuityScore != '20/20' || leftEyeResults.acuityScore != '20/20') {
+      recommendations.add('Consider getting a comprehensive eye exam for accurate prescription');
+    }
+    
+    // Astigmatism recommendations
+    if (rightEyeResults.astigmatismCyl.abs() > 0.5 || leftEyeResults.astigmatismCyl.abs() > 0.5) {
+      recommendations.add('Astigmatism detected - consult an eye care professional');
+    }
+    
+    // Color vision recommendations
+    if (rightEyeResults.colorVisionResult != 'normal' || leftEyeResults.colorVisionResult != 'normal') {
+      recommendations.add('Color vision deficiency detected - consider professional evaluation');
+    }
+    
+    // Near vision recommendations
+    if (rightEyeResults.nearVision == 'N12' || leftEyeResults.nearVision == 'N12') {
+      recommendations.add('Near vision may need correction - consider reading glasses');
+    }
+    
+    if (recommendations.isEmpty) {
+      recommendations.add('Your vision appears to be within normal ranges');
+    }
+    
+    return recommendations;
   }
 
   Widget _buildResultRow(String title, String value, IconData icon) {
@@ -1022,6 +1998,30 @@ class _VisionTestScreenState extends State<VisionTestScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildResultMetric(String title, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: const Color(0xFF10B2D0), size: 24),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF111718),
+          ),
+        ),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF618389),
+          ),
+        ),
+      ],
     );
   }
 

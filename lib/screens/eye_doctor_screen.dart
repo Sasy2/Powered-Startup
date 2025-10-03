@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 // import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/chat_provider.dart';
 import '../models/chat_model.dart';
+import '../widgets/app_header.dart';
+import '../widgets/app_footer.dart';
 
 class EyeDoctorScreen extends StatefulWidget {
   const EyeDoctorScreen({super.key});
@@ -56,13 +58,13 @@ class _EyeDoctorScreenState extends State<EyeDoctorScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
+            const AppHeader(title: 'EyeDoctor'),
             Expanded(child: _buildChatArea()),
             _buildInputArea(),
+            const AppFooter(currentIndex: 3),
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigation(context),
     );
   }
 
@@ -137,7 +139,7 @@ class _EyeDoctorScreenState extends State<EyeDoctorScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Dr. Aisha',
+                  'EyeDoctor',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -145,7 +147,7 @@ class _EyeDoctorScreenState extends State<EyeDoctorScreen> {
                   ),
                 ),
                 Text(
-                  'AI Eye Care Assistant',
+                  'Eye Care Assistant',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
@@ -217,7 +219,7 @@ class _EyeDoctorScreenState extends State<EyeDoctorScreen> {
           ),
           const SizedBox(height: 20),
           const Text(
-            'Hello! I\'m Dr. Aisha',
+            'Hello! I\'m EyeDoctor',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -226,7 +228,7 @@ class _EyeDoctorScreenState extends State<EyeDoctorScreen> {
           ),
           const SizedBox(height: 10),
           const Text(
-            'Your AI-powered eye care assistant.\nHow can I help you today?',
+            'Your intelligent eye care assistant.\nHow can I help you today?',
             style: TextStyle(
               fontSize: 16,
               color: Color(0xFF618389),
@@ -453,7 +455,7 @@ class _EyeDoctorScreenState extends State<EyeDoctorScreen> {
                   child: TextField(
                     controller: _messageController,
                     decoration: const InputDecoration(
-                      hintText: 'Ask Dr. Aisha anything...',
+                      hintText: 'Ask EyeDoctor anything...',
                       hintStyle: TextStyle(color: Color(0xFF618389)),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(

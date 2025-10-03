@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'vision_test_screen.dart';
-import 'exercises_screen.dart';
+import 'comprehensive_exercises_screen.dart';
 import 'eye_doctor_screen.dart';
 import 'profile_screen.dart';
 
@@ -253,7 +253,7 @@ class HomeScreen extends StatelessWidget {
                 () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ExercisesScreenNew(),
+                    builder: (context) => const ComprehensiveExercisesScreen(),
                   ),
                 ),
               ),
@@ -466,7 +466,7 @@ class HomeScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const ExercisesScreenNew(),
+                  builder: (context) => const ComprehensiveExercisesScreen(),
                 ),
               );
             } else if (index == 3) {

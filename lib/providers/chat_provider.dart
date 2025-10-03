@@ -142,9 +142,9 @@ class ChatProvider with ChangeNotifier {
     // Greeting responses with variation
     if (message.contains('hello') || message.contains('hi') || message.contains('hey')) {
       final greetings = [
-        'Hello! I\'m Dr. Aisha, your AI eye care assistant. How can I help you with your eye health today?',
+        'Hello! I\'m EyeDoctor, your intelligent eye care assistant. How can I help you with your eye health today?',
         'Hi there! I\'m here to help with all your eye health questions. What would you like to know?',
-        'Hey! Welcome to EyeCon. I\'m your virtual eye care assistant. How can I assist you today?',
+        'Hey! Welcome to Sighty. I\'m your virtual eye care assistant. How can I assist you today?',
         'Hello! I\'m excited to help you with your eye health journey. What brings you here today?',
       ];
       return greetings[DateTime.now().millisecond % greetings.length];

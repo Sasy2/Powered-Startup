@@ -1,2 +1,2 @@
 
-export 'exercises_screen_new.dart';
+export 'comprehensive_exercises_screen.dart';

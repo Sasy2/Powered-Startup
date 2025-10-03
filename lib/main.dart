@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'screens/home_screen.dart';
+import 'screens/modern_home_screen.dart';
 import 'screens/vision_test_screen.dart';
-import 'screens/exercises_screen_new.dart';
+import 'screens/comprehensive_exercises_screen.dart';
 import 'screens/eye_doctor_screen.dart';
 import 'screens/profile_screen.dart';
 import 'providers/user_provider.dart';
@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: MaterialApp(
-        title: 'EyeCon',
+        title: 'Sighty',
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(
@@ -35,13 +35,13 @@ class MyApp extends StatelessWidget {
           fontFamily: 'Inter',
         ),
         debugShowCheckedModeBanner: false,
-        routes: {
-          '/': (context) => const HomeScreen(),
-          '/vision_test': (context) => const VisionTestScreen(),
-          '/exercises': (context) => const ExercisesScreenNew(),
-          '/chat': (context) => const EyeDoctorScreen(),
-          '/profile': (context) => const ProfileScreen(),
-        },
+            routes: {
+              '/': (context) => const ModernHomeScreen(),
+              '/vision_test': (context) => const VisionTestScreen(),
+              '/exercises': (context) => const ComprehensiveExercisesScreen(),
+              '/chat': (context) => const EyeDoctorScreen(),
+              '/profile': (context) => const ProfileScreen(),
+            },
       ),
     );
   }
